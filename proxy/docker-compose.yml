@@ -39,7 +39,7 @@ services:
   # portant le label com.centurylinklabs.watchtower.enable=true (api/front des
   # deux stacks). Chaque conteneur est comparé à son propre tag d'image.
   watchtower:
-    image: containrrr/watchtower
+    image: nickfedor/watchtower
     restart: unless-stopped
     command: --interval 60 --cleanup --label-enable
     volumes:

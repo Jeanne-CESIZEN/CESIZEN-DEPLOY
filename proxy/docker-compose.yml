@@ -1,0 +1,52 @@
+# Services PARTAGÉS par les deux environnements (staging + prod) :
+#   - Traefik    : reverse proxy unique, écoute 80/443, HTTPS Let's Encrypt
+#   - Watchtower : unique, surveille TOUS les conteneurs labellisés et redéploie
+#                  chacun selon son propre tag (:staging ou :prod)
+#
+# Pré-requis (une seule fois) :  docker network create web
+# Démarrage          :  docker compose up -d
+
+name: cesizen-proxy
+
+services:
+  traefik:
+    image: traefik:v3.1
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=web"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirection globale HTTP -> HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt (challenge HTTP)
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    networks:
+      - web
+
+  # Watchtower partagé : --label-enable => ne surveille que les conteneurs
+  # portant le label com.centurylinklabs.watchtower.enable=true (api/front des
+  # deux stacks). Chaque conteneur est comparé à son propre tag d'image.
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    command: --interval 60 --cleanup --label-enable
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      # Identifiants GHCR pour pull des images privées (voir README)
+      - "${HOME}/.docker/config.json:/config.json:ro"
+
+networks:
+  web:
+    external: true

@@ -1,0 +1,72 @@
+# Stack STAGING (images :staging, déployées depuis la branche develop).
+# Le reverse proxy Traefik et Watchtower sont fournis par deploy/proxy.
+#
+# Démarrage :  docker compose --env-file .env up -d
+
+name: cesizen-staging
+
+services:
+  postgres:
+    image: postgres:16.1
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  api:
+    image: ghcr.io/jeanne-cesizen/cesizen-api:staging
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL}
+      JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL}
+      CORS_ORIGIN: https://${DOMAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-staging.rule=Host(`api-${DOMAIN}`)"
+      - "traefik.http.routers.api-staging.entrypoints=websecure"
+      - "traefik.http.routers.api-staging.tls.certresolver=le"
+      - "traefik.http.services.api-staging.loadbalancer.server.port=3000"
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - web
+      - internal
+
+  front:
+    image: ghcr.io/jeanne-cesizen/cesizen-front:staging
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.front-staging.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.front-staging.entrypoints=websecure"
+      - "traefik.http.routers.front-staging.tls.certresolver=le"
+      - "traefik.http.services.front-staging.loadbalancer.server.port=80"
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - web
+
+volumes:
+  postgres-data:
+
+networks:
+  web:
+    external: true
+  internal:

@@ -35,6 +35,9 @@ services:
     volumes:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      # Fichier d'utilisateurs basic-auth (htpasswd) — non interprété par compose,
+      # donc AUCUN $ à échapper (voir README pour le générer)
+      - "./auth/users:/auth/users:ro"
     labels:
       - "traefik.enable=true"
       # Router du dashboard : https://traefik.DOMAIN, protégé par auth basique
@@ -43,8 +46,8 @@ services:
       - "traefik.http.routers.dashboard.tls.certresolver=le"
       - "traefik.http.routers.dashboard.service=api@internal"
       - "traefik.http.routers.dashboard.middlewares=dashboard-auth"
-      # Authentification basique (identifiants dans .env, voir README)
-      - "traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+      # Authentification basique via fichier (htpasswd)
+      - "traefik.http.middlewares.dashboard-auth.basicauth.usersfile=/auth/users"
     networks:
       - web
 

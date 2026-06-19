@@ -1,0 +1,9 @@
+# Fichier d'utilisateurs basic-auth (format htpasswd) pour le dashboard Traefik.
+# Copier ce fichier en "users" (sans extension) et y mettre ton vrai hash.
+#
+# Générer le hash (bcrypt recommandé) :
+#   htpasswd -nbB admin 'MotDePasseFort' > users
+#
+# Format : une ligne par utilisateur  ->  identifiant:hash
+# Aucun échappement nécessaire : ce fichier n'est PAS interprété par compose.
+admin:REMPLACER_PAR_LE_HASH_HTPASSWD
